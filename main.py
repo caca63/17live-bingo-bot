@@ -37,7 +37,7 @@ def get_latest_numbers():
         # --- HTML 抓取邏輯 (這部分最容易隨網頁更新而改變) ---
         # 這裡假設開獎號碼所在的標籤具有特定 class，實際需依網頁檢查結果修改
         # 建議先手動檢查 17LIVE 網頁，看那 5 個數字的 CSS Class 是什麼
-        elements = driver.find_elements(By.CLASS_NAME, "bingo-num") 
+        elements = driver.find_elements(By.CLASS_NAME, "sc-1d51a4b1-8 ihNWIJ") 
         
         # 如果 class 抓不到，也可以試著抓所有的 span 或 div 再過濾
         if not elements:
