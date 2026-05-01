@@ -15,15 +15,11 @@ TARGET_URL = "https://vmo.17.media/2604-bingo/index.html?utm_campaign=24850&utm_
 DATA_FILE = "bingo_history.csv"
 
 def get_latest_numbers():
-    """在 Linux 無頭環境下啟動瀏覽器並精準抓取號碼"""
     chrome_options = Options()
-    
-    # GitHub Actions 必須使用的參數
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--window-size=1920,1080")
-    # 偽裝瀏覽器指紋
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     
     service = Service(ChromeDriverManager().install())
@@ -33,35 +29,40 @@ def get_latest_numbers():
         print(f"正在前往網頁: {TARGET_URL}")
         driver.get(TARGET_URL)
         
-        # 使用顯式等待：等待該數字元件出現在畫面上，最長等 20 秒
-        wait = WebDriverWait(driver, 20)
-        # 注意：CSS Selector 中，空格要換成點，所以 sc-1d51a4b1-8 ihNWIJ 變成 .sc-1d51a4b1-8.ihNWIJ
-        target_css = ".sc-1d51a4b1-8.ihNWIJ"
-        
-        print("等待元件載入...")
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, target_css)))
-        
-        # 額外停留一下確保數字內容填入
-        time.sleep(5)
-        
-        # 抓取所有符合該 Class 的元素
-        elements = driver.find_elements(By.CSS_SELECTOR, target_css)
-        
-        numbers = []
-        for e in elements:
-            val = e.text.strip()
-            if val.isdigit():
-                numbers.append(int(val))
-        
-        print(f"原始抓取結果: {numbers}")
+        # 增加強制等待時間，確保所有動態內容載入
+        time.sleep(15) 
 
-        # 如果抓到的號碼很多（例如包含歷史紀錄），我們通常取最新的 5 個
-        # 17LIVE 這種頁面通常前 5 個就是當天最新的
-        if len(numbers) >= 5:
-            final_nums = numbers[:5]
+        # --- 策略：抓取網頁中所有「純數字」標籤 ---
+        # 我們不再依賴那個 sc-xxxx 的 Class，改用標籤過濾
+        all_tags = driver.find_elements(By.XPATH, "//div | //span | //p")
+        
+        raw_numbers = []
+        for tag in all_tags:
+            try:
+                val = tag.text.strip()
+                # 判斷是否為 1-99 的數字，且長度通常是 1-2 位數
+                if val.isdigit() and 1 <= int(val) <= 99:
+                    raw_numbers.append(int(val))
+            except:
+                continue
+
+        # 過濾重複數字並保持出現順序
+        unique_nums = []
+        for n in raw_numbers:
+            if n not in unique_nums:
+                unique_nums.append(n)
+
+        print(f"掃描到的所有疑似號碼: {unique_nums}")
+
+        # 17LIVE 賓果通常每天開 5 個號碼
+        # 如果抓到很多數字，根據網頁排版，開獎號碼通常會是連續出現的一組
+        # 這裡我們取「最後出現」的 5 個數字（通常是開獎區）
+        if len(unique_nums) >= 5:
+            # 你可以根據 Log 輸出的順序調整取前 5 個 [:5] 或後 5 個 [-5:]
+            final_nums = unique_nums[:5] 
             return final_nums
         else:
-            print(f"錯誤：僅抓到 {len(numbers)} 個數字，不足 5 個。")
+            print(f"失敗：僅掃描到 {len(unique_nums)} 個數字，不足 5 個。")
             return None
             
     except Exception as e:
